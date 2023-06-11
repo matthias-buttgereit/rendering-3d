@@ -1,25 +1,22 @@
 pub mod wavefront;
 
 use image::{Rgb, RgbImage};
+use nalgebra::Vector3;
 use wavefront::WavefrontObject;
 
-fn draw_triangle(image: &mut RgbImage, triangle: &Triangle, _color: [u8; 3]) {
+fn draw_triangle(image: &mut RgbImage, triangle: &Triangle2d<u32>, color: [u8; 3]) {
     let ((x0, y0), (x1, y1)) = get_bounding_box(triangle);
-
-    let r: u8 = ((125 * triangle.a.0) % 256) as u8;
-    let g: u8 = ((12 * triangle.b.1) % 256) as u8;
-    let b: u8 = ((234 * triangle.c.1) % 256) as u8;
 
     for x in x0..=x1 {
         for y in y0..=y1 {
             if triangle.contains((x, y)) {
-                image.put_pixel(x, y, Rgb([r, g, b]));
+                image.put_pixel(x, y, Rgb(color));
             }
         }
     }
 }
 
-fn get_bounding_box(triangle: &Triangle) -> ((u32, u32), (u32, u32)) {
+fn get_bounding_box(triangle: &Triangle2d<u32>) -> ((u32, u32), (u32, u32)) {
     let x_min = triangle.a.0.min(triangle.b.0.min(triangle.c.0));
     let x_max = triangle.a.0.max(triangle.b.0.max(triangle.c.0));
 
@@ -42,9 +39,16 @@ fn map_xy_to_image((x, y): (f32, f32), img: &RgbImage) -> (u32, u32) {
 }
 
 pub fn draw_object(object: WavefrontObject, img: &mut RgbImage) {
-    let color = [255u8, 255u8, 255u8];
+    let light_direction = Vector3::new(0.0, 0.0, -1.0);
+    let (w, h) = img.dimensions();
+    let mut _zbuffer: Vec<Vec<i32>> = vec![vec![i32::MIN; h as usize]; w as usize];
 
     for face in object.faces() {
+        let triangle3d = Triangle3d::new(face.vertices().0, face.vertices().1, face.vertices().2);
+        let normal_vector = triangle3d.get_normal();
+
+        let intensity = light_direction.dot(&normal_vector);
+
         let a = face.vertices().0;
         let b = face.vertices().1;
         let c = face.vertices().2;
@@ -53,20 +57,54 @@ pub fn draw_object(object: WavefrontObject, img: &mut RgbImage) {
         let (x1, y1) = map_xy_to_image((b.x, b.y), img);
         let (x2, y2) = map_xy_to_image((c.x, c.y), img);
 
-        let triangle = Triangle::new((x0, y0), (x1, y1), (x2, y2));
+        let triangle = Triangle2d::new((x0, y0), (x1, y1), (x2, y2));
 
-        draw_triangle(img, &triangle, color);
+        if intensity > 0.0 {
+            draw_triangle(
+                img,
+                &triangle,
+                [
+                    (255.0 * intensity) as u8,
+                    (255.0 * intensity) as u8,
+                    (255.0 * intensity) as u8,
+                ],
+            );
+        }
     }
 }
 
 #[derive(Default, Debug)]
-pub struct Triangle {
-    a: (u32, u32),
-    b: (u32, u32),
-    c: (u32, u32),
+pub struct Triangle2d<N> {
+    a: (N, N),
+    b: (N, N),
+    c: (N, N),
 }
 
-impl Triangle {
+pub struct Triangle3d<N> {
+    a: Vector3<N>,
+    b: Vector3<N>,
+    c: Vector3<N>,
+}
+
+impl Triangle3d<f32> {
+    pub fn new(a: Vector3<f32>, b: Vector3<f32>, c: Vector3<f32>) -> Self {
+        Self { a, b, c }
+    }
+
+    pub fn get_normal(&self) -> Vector3<f32> {
+        let v1 = self.b - self.a;
+        let v2 = self.c - self.a;
+
+        Vector3::new(
+            (v1.z * v2.y) - (v1.y * v2.z),
+            (v1.x * v2.z) - (v1.z * v2.x),
+            (v1.y * v2.x) - (v1.x * v2.y),
+        )
+        .normalize()
+    }
+}
+
+impl Triangle2d<u32> {
     pub fn new(a: (u32, u32), b: (u32, u32), c: (u32, u32)) -> Self {
         Self { a, b, c }
     }
