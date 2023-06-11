@@ -3,13 +3,17 @@ pub mod wavefront;
 use image::{Rgb, RgbImage};
 use wavefront::WavefrontObject;
 
-fn draw_triangle(image: &mut RgbImage, triangle: &Triangle, color: [u8; 3]) {
+fn draw_triangle(image: &mut RgbImage, triangle: &Triangle, _color: [u8; 3]) {
     let ((x0, y0), (x1, y1)) = get_bounding_box(triangle);
+
+    let r: u8 = ((125 * triangle.a.0) % 256) as u8;
+    let g: u8 = ((12 * triangle.b.1) % 256) as u8;
+    let b: u8 = ((234 * triangle.c.1) % 256) as u8;
 
     for x in x0..=x1 {
         for y in y0..=y1 {
             if triangle.contains((x, y)) {
-                image.put_pixel(x, y, Rgb(color));
+                image.put_pixel(x, y, Rgb([r, g, b]));
             }
         }
     }
