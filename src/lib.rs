@@ -105,7 +105,7 @@ pub fn draw_object(object: WavefrontObject, img: &mut RgbImage, texture_map: &Dy
     let (w, h) = img.dimensions();
     let mut zbuffer: Vec<Vec<u8>> = vec![vec![0; h as usize]; w as usize];
 
-    let texture = texture_map.flipv().fliph();
+    let texture = texture_map.flipv();
     let texture = texture.as_rgb8().unwrap();
 
     for face in object.faces() {
