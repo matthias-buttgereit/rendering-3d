@@ -9,11 +9,13 @@ pub struct WavefrontObject {
 }
 
 impl WavefrontObject {
+    #[must_use]
     pub fn new() -> Self {
         Self { faces: vec![] }
     }
 
-    pub fn parse_obj_file(text: &str) -> WavefrontObject {
+    #[must_use]
+    pub fn parse_obj_file(text: &str) -> Self {
         let input = text;
 
         let mut vertices = Vec::new();
@@ -132,6 +134,7 @@ pub struct Face {
 }
 
 impl Face {
+    #[must_use]
     pub fn new(
         vertices: ThreeVectors<f32>,
         texture: ThreeVectors<f32>,
