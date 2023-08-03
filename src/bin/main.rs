@@ -1,23 +1,31 @@
-use image::{ImageBuffer, RgbImage};
-use rendering_3d::{draw_object, wavefront::WavefrontObject};
+use rendering_3d::object::Object;
 
 fn main() {
-    let width: u32 = 1920;
-    let height: u32 = 1920;
+    let width: u32 = 5000;
+    let height: u32 = 5000;
 
-    let filename = "african_head";
+    let name = "african_head";
 
-    let mut img: RgbImage = ImageBuffer::new(width, height);
+    let model = format!("{name}.obj");
+    let texture = format!("{name}_diffuse.tga");
 
-    let object_file = std::fs::read_to_string(format!("{filename}.obj"))
-        .expect("Couldn't read file {file_name}.obj");
-    let object = WavefrontObject::parse_obj_file(&object_file);
+    let mut object = Object::new(&model);
+    object.set_texture(&texture);
 
-    let texture = image::open(format!("{filename}_diffuse.tga"))
-        .expect("Couldn't load {filename}.tga as texture.");
+    object.render_to_image("head.png", width, height).unwrap();
 
-    draw_object(object, &mut img, &texture);
+    // let mut img: RgbImage = ImageBuffer::new(width, height);
 
-    let img = image::imageops::flip_vertical(&img);
-    img.save("test.png").expect("Failed to save Image to File.");
+    // let object_file = std::fs::read_to_string(format!("{filename}.obj"))
+    //     .expect("Couldn't read file {file_name}.obj");
+    // let object = WavefrontObject::parse_obj_file(&object_file);
+
+    // let texture = image::open(format!("{filename}_diffuse.tga"))
+    //     .expect("Couldn't load {filename}.tga as texture.");
+
+    // draw_object(&object, &mut img, &texture);
+
+    // let img = image::imageops::flip_vertical(&img);
+    // img.save(format!("{filename}.png"))
+    //     .expect("Failed to save Image to File.");
 }
