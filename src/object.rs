@@ -23,8 +23,10 @@ impl Object {
     }
 
     pub fn set_texture(&mut self, filename: &str) {
-        let texture = image::open(filename)
-            .expect(&format!("Couldn't load {filename}.tga as texture."));
+        let texture =
+            image::open(filename).expect(&format!("Couldn't load {filename}.tga as texture."));
+
+        let texture = texture.flipv();
 
         self.texture = Some(texture);
     }
@@ -43,58 +45,71 @@ impl Object {
         let (w, h) = img.dimensions();
         let mut zbuffer: Vec<Vec<u8>> = vec![vec![0; h as usize]; w as usize];
 
-        if let Some(texture) = &self.texture {
-            let texture = texture.flipv();
-            let texture = texture.as_rgb8().unwrap();
+        for face in self.model.faces() {
+            let triangle3d = Triangle3d::from_vertices(face.vertices());
+            let normal_vector = triangle3d.get_normal();
 
-            for face in self.model.faces() {
-                let triangle3d = Triangle3d::from_vertices(face.vertices());
-                let normal_vector = triangle3d.get_normal();
+            let intensity = light_direction.dot(&normal_vector);
 
-                let intensity = light_direction.dot(&normal_vector);
+            //eprintln!("UHM!");
 
-                let drawable_triangle = map_triangle_to_image(&triangle3d, img);
+            let drawable_triangle = map_triangle_to_image(&triangle3d, img);
 
-                if intensity > 0.0 {
-                    Self::draw_triangle(
-                        img,
-                        &drawable_triangle,
-                        intensity,
-                        &mut zbuffer,
-                        texture,
-                        face.texture(),
-                    );
-                }
+            let color_triangle;
+
+            if let Some(texture) = &self.texture {
+                let texture = texture.flipv();
+                let texture = texture.as_rgb8().unwrap();
+                color_triangle = get_color_triangle(face.texture(), texture);
+            } else {
+                color_triangle = (Vector3::default(), Vector3::default(), Vector3::default())
+            };
+
+            if intensity > 0.0 {
+                self.draw_triangle(
+                    img,
+                    &drawable_triangle,
+                    intensity,
+                    &mut zbuffer,
+                    &color_triangle,
+                );
             }
         }
     }
 
     fn draw_triangle(
+        &self,
         image: &mut RgbImage,
         triangle: &Triangle3d,
         intensity: f32,
         zbuffer: &mut [Vec<u8>],
-        texture: &RgbImage,
-        texture_vertices: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
+        color_triangle: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
     ) {
         let ((x0, y0), (x1, y1)) = get_bounding_box(triangle);
         let x0 = x0.floor() as u32;
         let y0 = y0.floor() as u32;
         let x1 = x1.ceil() as u32;
         let y1 = y1.ceil() as u32;
-        let color_triangle = get_color_triangle(texture_vertices, texture);
+
+        //eprintln!("WAAS?!");
 
         for x in x0..=x1 {
             for y in y0..=y1 {
                 if let Some((s, t, u)) = triangle.barycentric_coords((x, y)) {
                     let z = s * triangle.a.z + t * triangle.b.z + u * triangle.c.z;
 
-                    let color = *texture.get_pixel(
-                        (color_triangle.0.x * s + color_triangle.1.x * t + color_triangle.2.x * u)
-                            as u32,
-                        (color_triangle.0.y * s + color_triangle.1.y * t + color_triangle.2.y * u)
-                            as u32,
-                    );
+                    let color = if let Some(texture) = &self.texture {
+                        texture.as_rgb8().unwrap().get_pixel(
+                            (color_triangle.0.x * s
+                                + color_triangle.1.x * t
+                                + color_triangle.2.x * u) as u32,
+                            (color_triangle.0.y * s
+                                + color_triangle.1.y * t
+                                + color_triangle.2.y * u) as u32,
+                        )
+                    } else {
+                        &Rgb([255, 255, 255])
+                    };
 
                     let color = Rgb([
                         (color.0[0] as f32 * intensity) as u8,
