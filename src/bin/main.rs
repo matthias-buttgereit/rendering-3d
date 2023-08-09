@@ -1,8 +1,8 @@
 use rendering_3d::object::Object;
 
 fn main() {
-    let width: u32 = 1920;
-    let height: u32 = 1920;
+    let width: u32 = 600;
+    let height: u32 = 600;
 
     let name = "african_head";
 

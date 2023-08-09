@@ -1,7 +1,7 @@
 use image::{DynamicImage, ImageBuffer, ImageResult, Pixel, Rgb, RgbImage};
-use nalgebra::{matrix, vector, Matrix4, Vector3, Vector4};
+use nalgebra::Vector3;
 
-use crate::wavefront::WavefrontObject;
+use crate::{camera::Camera, wavefront::WavefrontObject};
 
 // const ZBUFFER_DEPTH: f32 = 255.0;
 
@@ -20,7 +20,7 @@ impl Object {
         Self {
             model: object,
             texture: None,
-            camera: Camera::new(3.0),
+            camera: Camera::new(5.0),
         }
     }
 
@@ -33,8 +33,14 @@ impl Object {
         self.texture = Some(texture);
     }
 
-    pub fn render_to_image(&self, name: &str, width: u32, height: u32) -> ImageResult<()> {
+    pub fn render_to_image(&mut self, name: &str, width: u32, height: u32) -> ImageResult<()> {
         let mut image_buffer: RgbImage = ImageBuffer::new(width, height);
+
+        self.camera.lookat(
+            Vector3::new(3.0, 1.0, 2.0),
+            Vector3::new(0.0, 0.0, 0.0),
+            Vector3::new(0.0, 1.0, 0.0),
+        );
 
         self.set_pixels_in_buffer(&mut image_buffer);
 
@@ -43,17 +49,16 @@ impl Object {
     }
 
     fn set_pixels_in_buffer(&self, img: &mut RgbImage) {
-        let light_direction = Vector3::new(0.0, 0.0, -1.0);
+        let light_direction = Vector3::new(0.0, 0.0, -1.0).normalize();
         let (width, height) = img.dimensions();
         let mut zbuffer: Vec<Vec<u8>> = vec![vec![0; height as usize]; width as usize];
 
         for face in self.model.faces() {
             let mut triangle_3d = Triangle3d::from_vertices(face.vertices());
 
-            let normal_vector = triangle_3d.get_normal();
-            let intensity = light_direction.dot(&normal_vector);
+            // let normal_vector = triangle_3d.get_normal();
+            // let intensity = light_direction.dot(&normal_vector);
 
-            // let triangle_in_image_space = map_triangle_to_image(&triangle_3d, img);
             self.camera.transform(&mut triangle_3d);
 
             let color_triangle;
@@ -66,9 +71,10 @@ impl Object {
                 color_triangle = (Vector3::default(), Vector3::default(), Vector3::default())
             };
 
-            if intensity > 0.0 {
-                self.draw_triangle(img, &triangle_3d, intensity, &mut zbuffer, &color_triangle);
-            }
+            // if intensity > 0.0 {
+            let intensity = 1.0;
+            self.draw_triangle(img, &triangle_3d, intensity, &mut zbuffer, &color_triangle);
+            // }
         }
     }
 
@@ -107,7 +113,6 @@ impl Object {
                         };
 
                         let color = color.map(|x| (x as f32 * intensity) as u8);
-
                         image.put_pixel(x, y, color);
                         zbuffer[x as usize][y as usize] = z as u8;
                     }
@@ -173,10 +178,10 @@ fn get_bounding_box(triangle: &Triangle3d) -> ((f32, f32), (f32, f32)) {
     ((x_min, y_min), (x_max, y_max))
 }
 
-struct Triangle3d {
-    a: Vector3<f32>,
-    b: Vector3<f32>,
-    c: Vector3<f32>,
+pub struct Triangle3d {
+    pub a: Vector3<f32>,
+    pub b: Vector3<f32>,
+    pub c: Vector3<f32>,
 }
 
 impl Triangle3d {
@@ -217,55 +222,11 @@ impl Triangle3d {
             / ((p2.y - p3.y) * (p1.x - p3.x) + (p3.x - p2.x) * (p1.y - p3.y));
 
         if s >= 0.0 && t >= 0.0 && s + t <= 1.0 {
+            // eprintln!("YES!");
             let u = 1.0 - s - t;
             Some((s, t, u))
         } else {
             None
         }
-    }
-}
-
-#[derive(Default)]
-struct Camera {
-    projection: Matrix4<f32>,
-    viewport: Matrix4<f32>,
-}
-
-impl Camera {
-    pub fn new(c: f32) -> Self {
-        let projection = matrix![1.0, 0.0, 0.0, 0.0;
-                                                                     0.0, 1.0, 0.0, 0.0;
-                                                                     0.0, 0.0, 1.0, 0.0;
-                                                                     0.0, 0.0, -1.0/c, 1.0];
-
-        let viewport = matrix![960.0, 0.0, 0.0, 960.0;
-                                                                   0.0, 960.0, 0.0, 960.0;
-                                                                   0.0, 0.0, 127.0, 127.0;
-                                                                   0.0, 0.0, 0.0, 1.0];
-
-        Self {
-            projection,
-            viewport,
-        }
-    }
-
-    // pub fn set_viewport(&mut self, width: u32, height: u32) {
-    //     self.viewport
-    // }
-
-    pub fn transform(&self, triangle: &mut Triangle3d) {
-        self.transform_vertex(&mut triangle.a);
-        self.transform_vertex(&mut triangle.b);
-        self.transform_vertex(&mut triangle.c);
-    }
-
-    fn transform_vertex(&self, vector: &mut Vector3<f32>) {
-        let vector4: Vector4<f32> = vector![vector.x, vector.y, vector.z, 1.0];
-
-        let vector4 = self.viewport * self.projection * vector4;
-        let w = vector4.w;
-        let vector3 = vector![vector4.x / w, vector4.y / w, vector4.z / w];
-
-        *vector = vector3;
     }
 }
