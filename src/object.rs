@@ -1,11 +1,11 @@
-use image::{DynamicImage, ImageBuffer, ImageResult, Pixel, Rgb, RgbImage};
+use image::{ImageBuffer, ImageResult, Pixel, RgbImage};
 use nalgebra::Vector3;
 
 use crate::{camera::Camera, wavefront::WavefrontObject};
 
 pub struct Object {
     model: WavefrontObject,
-    texture: Option<DynamicImage>,
+    texture: RgbImage,
     camera: Camera,
 }
 
@@ -17,7 +17,7 @@ impl Object {
 
         Self {
             model: object,
-            texture: None,
+            texture: RgbImage::default(),
             camera: Camera::new(5.0),
         }
     }
@@ -43,8 +43,8 @@ impl Object {
             .unwrap_or_else(|_| panic!("Couldn't load {filename}.tga as texture."));
 
         let texture = texture.flipv();
-
-        self.texture = Some(texture);
+        let rgb = texture.to_rgb8();
+        self.texture = rgb;
     }
 
     pub fn render_to_image(&mut self, name: &str, width: u32, height: u32) -> ImageResult<()> {
@@ -60,32 +60,17 @@ impl Object {
     }
 
     fn set_pixels_in_buffer(&self, img: &mut RgbImage) {
-        let light_direction = Vector3::new(0.0, 0.0, -1.0).normalize();
+        let light_direction = Vector3::new(-1.0, 0.0, -1.0).normalize();
         let (width, height) = img.dimensions();
         let mut zbuffer: Vec<Vec<f32>> = vec![vec![0.0; height as usize]; width as usize];
-        let texture = if let Some(texture) = &self.texture {
-            let dyn_image = texture;
-            let image_buffer = dyn_image.as_rgb8().unwrap();
-            Some(image_buffer)
-        } else {
-            None
-        };
 
         for face in self.model.faces() {
             let mut triangle_3d = Triangle3d::from_vertices(face.vertices());
 
+            self.camera.transform(&mut triangle_3d);
             let normal_vector = triangle_3d.get_normal();
             let intensity = light_direction.dot(&normal_vector);
-
-            self.camera.transform(&mut triangle_3d);
-
-            let color_triangle;
-
-            if let Some(texture) = texture {
-                color_triangle = get_color_triangle(face.texture(), texture);
-            } else {
-                color_triangle = (Vector3::default(), Vector3::default(), Vector3::default())
-            };
+            let color_triangle = get_color_triangle(face.texture(), &self.texture);
 
             if intensity > 0.0 {
                 self.draw_triangle(img, &triangle_3d, intensity, &mut zbuffer, &color_triangle);
@@ -99,7 +84,7 @@ impl Object {
         triangle: &Triangle3d,
         intensity: f32,
         zbuffer: &mut [Vec<f32>],
-        color_triangle: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
+        texture: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
     ) {
         let ((x0, y0), (x1, y1)) = get_bounding_box(triangle);
         let x0 = x0.floor().max(0.0) as u32;
@@ -112,22 +97,16 @@ impl Object {
                 if let Some((s, t, u)) = triangle.barycentric_coords((x, y)) {
                     let z = s * triangle.a.z + t * triangle.b.z + u * triangle.c.z;
                     if zbuffer[x as usize][y as usize] < z {
-                        let color = if let Some(texture) = &self.texture {
-                            texture.as_rgb8().unwrap().get_pixel(
-                                (color_triangle.0.x * s
-                                    + color_triangle.1.x * t
-                                    + color_triangle.2.x * u)
-                                    as u32,
-                                (color_triangle.0.y * s
-                                    + color_triangle.1.y * t
-                                    + color_triangle.2.y * u)
-                                    as u32,
-                            )
-                        } else {
-                            &Rgb([255, 255, 255])
-                        };
+                        let texture_x =
+                            (texture.0.x * s + texture.1.x * t + texture.2.x * u) as u32;
+                        let texture_y =
+                            (texture.0.y * s + texture.1.y * t + texture.2.y * u) as u32;
 
-                        let color = color.map(|x| (x as f32 * intensity) as u8);
+                        let color = self
+                            .texture
+                            .get_pixel(texture_x, texture_y)
+                            .map(|x| (x as f32 * intensity) as u8);
+
                         image.put_pixel(x, y, color);
                         zbuffer[x as usize][y as usize] = z;
                     }
@@ -138,27 +117,14 @@ impl Object {
 }
 
 fn get_color_triangle(
-    texture_vertices: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
-    texture: &image::ImageBuffer<Rgb<u8>, Vec<u8>>,
+    vertices: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
+    texture: &RgbImage,
 ) -> (Vector3<f32>, Vector3<f32>, Vector3<f32>) {
     let (height, width) = (texture.height() as f32, texture.width() as f32);
-    let a = Vector3::new(
-        texture_vertices.0.x * width,
-        texture_vertices.0.y * height,
-        0.0,
-    );
 
-    let b = Vector3::new(
-        texture_vertices.1.x * width,
-        texture_vertices.1.y * height,
-        0.0,
-    );
-
-    let c = Vector3::new(
-        texture_vertices.2.x * width,
-        texture_vertices.2.y * height,
-        0.0,
-    );
+    let a = Vector3::new(vertices.0.x * width, vertices.0.y * height, 0.0);
+    let b = Vector3::new(vertices.1.x * width, vertices.1.y * height, 0.0);
+    let c = Vector3::new(vertices.2.x * width, vertices.2.y * height, 0.0);
 
     (a, b, c)
 }
@@ -217,7 +183,6 @@ impl Triangle3d {
             / ((p2.y - p3.y) * (p1.x - p3.x) + (p3.x - p2.x) * (p1.y - p3.y));
 
         if s >= 0.0 && t >= 0.0 && s + t <= 1.0 {
-            // eprintln!("YES!");
             let u = 1.0 - s - t;
             Some((s, t, u))
         } else {
