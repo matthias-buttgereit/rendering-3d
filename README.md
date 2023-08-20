@@ -1,9 +1,9 @@
 # TinyRenderer in Rust
 This is my project of implementing the tinyrenderer described in this [tutorial](https://github.com/ssloy/tinyrenderer) by ssloy in Rust.
 
-I started out by setting single pixels in an ImageBuffer and saving that to a png file (using the image crate). Afterwards I drew single lines and when that worked I managed to draw the edges of triangles.
+I started out by setting single pixels in an ImageBuffer and saving that to a png file (using the [image](https://crates.io/crates/image) crate). Afterwards I drew single lines and when that worked I managed to draw the edges of triangles.
 
-The tutorial provides some obj files that contain a (long) list of vertices, so points in 3D, and a list of faces, which are triangles in 3D always consisting of three of those previous vertices. Using the nom crate I parsed the file and was able to draw all the faces/triangles it contained. Only the edges at first so I tried to paint all triangles white for the start.
+The tutorial provides some obj files that contain a (long) list of vertices, so points in 3D, and a list of faces, which are triangles in 3D always consisting of three of those previous vertices. Using the [nom](https://crates.io/crates/nom) crate I parsed the file and was able to draw all the faces/triangles it contained. Only the edges at first so I tried to paint all triangles white for the start.
 
 ![](readme-images/1.png)
 
