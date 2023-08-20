@@ -60,16 +60,12 @@ impl Object {
     }
 
     fn set_pixels_in_buffer(&self, img: &mut RgbImage) {
-        let light_direction = Vector3::new(-2.0, -1.0, -1.0).normalize();
+        let light_direction = Vector3::new(0.0, -0.0, -1.0).normalize();
 
         let (width, height) = img.dimensions();
         let mut zbuffer: Vec<Vec<f32>> = vec![vec![0.0; height as usize]; width as usize];
 
         for face in self.model.faces() {
-            let average = (face.normals().0 + face.normals().1 + face.normals().2) / 3.0;
-            if average.dot(self.camera.view_dir()) < 0.0 {
-                continue;
-            }
             let mut triangle_3d = Triangle3d::from_vertices(face.vertices());
             self.camera.transform(&mut triangle_3d);
 
