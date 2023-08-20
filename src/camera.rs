@@ -60,7 +60,7 @@ impl Camera {
         self.model_view = matrix![x.x, x.y, x.z, -focus.x; y.x, y.y, y.z, -focus.y; z.x, z.y, z.z, -focus.z; 0.0, 0.0, 0.0, 1.0];
     }
 
-    pub fn view_dir(&self) -> Vector3<f32> {
-        self.viewing_direction
+    pub fn view_dir(&self) -> &Vector3<f32> {
+        &self.viewing_direction
     }
 }

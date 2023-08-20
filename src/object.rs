@@ -66,14 +66,24 @@ impl Object {
         let mut zbuffer: Vec<Vec<f32>> = vec![vec![0.0; height as usize]; width as usize];
 
         for face in self.model.faces() {
+            let average = (face.normals().0 + face.normals().1 + face.normals().2) / 3.0;
+            if average.dot(self.camera.view_dir()) < 0.0 {
+                continue;
+            }
             let mut triangle_3d = Triangle3d::from_vertices(face.vertices());
             self.camera.transform(&mut triangle_3d);
 
-            let normal_vector = triangle_3d.get_normal();
-            let intensity = light_direction.dot(&normal_vector);
+            // let normal_vector = triangle_3d.get_normal();
             let color_triangle = get_color_triangle(face.texture(), &self.texture);
 
-            self.draw_triangle(img, &triangle_3d, intensity, &mut zbuffer, &color_triangle);
+            self.draw_triangle(
+                img,
+                &triangle_3d,
+                &light_direction,
+                &mut zbuffer,
+                &color_triangle,
+                face.normals(),
+            );
         }
 
         draw_grey_image(zbuffer, width, height);
@@ -83,9 +93,10 @@ impl Object {
         &self,
         image: &mut RgbImage,
         triangle: &Triangle3d,
-        intensity: f32,
+        intensity: &Vector3<f32>,
         zbuffer: &mut [Vec<f32>],
         texture: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
+        normals: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
     ) {
         let ((x0, y0), (x1, y1)) = get_bounding_box(triangle);
         let (x0, y0, x1, y1) = clamp(x0, y0, x1, y1, image.dimensions());
@@ -94,7 +105,16 @@ impl Object {
             for y in y0..=y1 {
                 if let Some((s, t, u)) = triangle.contains_point((x, y)) {
                     let z = s * triangle.a.z + t * triangle.b.z + u * triangle.c.z;
-                    self.draw_point((s, t, u), zbuffer, (x, y, z), texture, intensity, image);
+                    let normal = (s * normals.0 + t * normals.1 + u * normals.2).normalize();
+                    self.draw_point(
+                        (s, t, u),
+                        zbuffer,
+                        (x, y, z),
+                        texture,
+                        intensity,
+                        image,
+                        normal,
+                    );
                 }
             }
         }
@@ -106,19 +126,22 @@ impl Object {
         zbuffer: &mut [Vec<f32>],
         (x, y, z): (u32, u32, f32),
         texture: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
-        intensity: f32,
+        intensity: &Vector3<f32>,
         image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
+        normal: Vector3<f32>,
     ) {
         if zbuffer[x as usize][y as usize] < z {
-            // let texture_x = (texture.0.x * s + texture.1.x * t + texture.2.x * u) as u32;
-            // let texture_y = (texture.0.y * s + texture.1.y * t + texture.2.y * u) as u32;
+            let texture_x = (texture.0.x * s + texture.1.x * t + texture.2.x * u) as u32;
+            let texture_y = (texture.0.y * s + texture.1.y * t + texture.2.y * u) as u32;
+            let intensity = (-1.0) * intensity.dot(&normal);
 
-            // let color = self
-            //     .texture
-            //     .get_pixel(texture_x, texture_y)
-            //     .map(|x| (x as f32 * intensity) as u8);
+            let color = self
+                .texture
+                .get_pixel(texture_x, texture_y)
+                .map(|x| (x as f32 * intensity) as u8);
 
-            let color: Rgb<u8> = Rgb([255, 255, 255]).map(|x| (x as f32 * intensity) as u8);
+            // let color: Rgb<u8> =
+            //     Rgb([255, 255, 255]).map(|x| (x as f32 * (-1.0) * intensity.dot(&normal)) as u8);
 
             image.put_pixel(x, y, color);
             zbuffer[x as usize][y as usize] = z;

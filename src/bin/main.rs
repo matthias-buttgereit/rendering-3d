@@ -10,7 +10,7 @@ fn main() {
     let texture = format!("data/{name}_diffuse.tga");
     let output = format!("output/{name}.png");
 
-    let origin = (0.0, 0.0, -3.0);
+    let origin = (-2.0, -1.0, -3.0);
     let focus = (0.0, 0.0, 0.0);
     let up = (0.0, 1.0, 0.0);
 
