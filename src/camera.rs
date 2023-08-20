@@ -7,6 +7,7 @@ pub struct Camera {
     projection: Matrix4<f32>,
     viewport: Matrix4<f32>,
     model_view: Matrix4<f32>,
+    viewing_direction: Vector3<f32>,
 }
 
 impl Camera {
@@ -20,6 +21,7 @@ impl Camera {
             projection,
             viewport,
             model_view: Matrix4::identity(),
+            viewing_direction: Vector3::default(),
         }
     }
 
@@ -29,7 +31,7 @@ impl Camera {
         self.transform_vertex(&mut triangle.c);
     }
 
-    fn transform_vertex(&self, vector: &mut Vector3<f32>) {
+    pub fn transform_vertex(&self, vector: &mut Vector3<f32>) {
         let vector4: Vector4<f32> = vector![vector.x, vector.y, vector.z, 1.0];
 
         let vector4 = self.viewport * self.projection * self.model_view * vector4;
@@ -49,11 +51,11 @@ impl Camera {
         self.projection = projection;
     }
 
-    pub fn lookat(&mut self, eye: Vector3<f32>, center: Vector3<f32>, up: Vector3<f32>) {
-        let z: Vector3<f32> = (eye - center).normalize();
+    pub fn lookat(&mut self, eye: Vector3<f32>, focus: Vector3<f32>, up: Vector3<f32>) {
+        let z: Vector3<f32> = (focus - eye).normalize();
         let x: Vector3<f32> = up.cross(&z).normalize();
         let y: Vector3<f32> = z.cross(&x).normalize();
 
-        self.model_view = matrix![x.x, x.y, x.z, -center.x; y.x, y.y, y.z, -center.y; z.x, z.y, z.z, -center.z; 0.0, 0.0, 0.0, 1.0];
+        self.model_view = matrix![x.x, x.y, x.z, -focus.x; y.x, y.y, y.z, -focus.y; z.x, z.y, z.z, -focus.z; 0.0, 0.0, 0.0, 1.0];
     }
 }

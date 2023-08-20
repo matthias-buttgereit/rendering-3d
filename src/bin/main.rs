@@ -6,10 +6,11 @@ fn main() {
 
     let name = "african_head";
 
-    let model = format!("{name}.obj");
-    let texture = format!("{name}_diffuse.tga");
+    let model = format!("data/{name}.obj");
+    let texture = format!("data/{name}_diffuse.tga");
+    let output = format!("output/{name}.png");
 
-    let origin = (-3.0, 2.0, 3.5);
+    let origin = (0.0, 0.0, -3.0);
     let focus = (0.0, 0.0, 0.0);
     let up = (0.0, 1.0, 0.0);
 
@@ -18,7 +19,5 @@ fn main() {
 
     object.set_camera(origin, focus, up);
 
-    object
-        .render_to_image("african_head.png", width, height)
-        .unwrap();
+    object.render_to_image(&output, width, height).unwrap();
 }

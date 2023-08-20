@@ -1,4 +1,4 @@
-use image::{ImageBuffer, ImageResult, Pixel, RgbImage};
+use image::{ImageBuffer, ImageResult, Pixel, Rgb, RgbImage};
 use nalgebra::Vector3;
 
 use crate::{camera::Camera, wavefront::WavefrontObject};
@@ -60,22 +60,23 @@ impl Object {
     }
 
     fn set_pixels_in_buffer(&self, img: &mut RgbImage) {
-        let light_direction = Vector3::new(-1.0, 0.0, -1.0).normalize();
+        let light_direction = Vector3::new(-2.0, -1.0, -1.0);
+
         let (width, height) = img.dimensions();
         let mut zbuffer: Vec<Vec<f32>> = vec![vec![0.0; height as usize]; width as usize];
 
         for face in self.model.faces() {
             let mut triangle_3d = Triangle3d::from_vertices(face.vertices());
-
             self.camera.transform(&mut triangle_3d);
+
             let normal_vector = triangle_3d.get_normal();
             let intensity = light_direction.dot(&normal_vector);
             let color_triangle = get_color_triangle(face.texture(), &self.texture);
 
-            if intensity > 0.0 {
-                self.draw_triangle(img, &triangle_3d, intensity, &mut zbuffer, &color_triangle);
-            }
+            self.draw_triangle(img, &triangle_3d, intensity, &mut zbuffer, &color_triangle);
         }
+
+        draw_grey_image(zbuffer, width, height);
     }
 
     fn draw_triangle(
@@ -94,26 +95,52 @@ impl Object {
 
         for x in x0..=x1 {
             for y in y0..=y1 {
-                if let Some((s, t, u)) = triangle.barycentric_coords((x, y)) {
+                if let Some((s, t, u)) = triangle.contains_point((x, y)) {
                     let z = s * triangle.a.z + t * triangle.b.z + u * triangle.c.z;
-                    if zbuffer[x as usize][y as usize] < z {
-                        let texture_x =
-                            (texture.0.x * s + texture.1.x * t + texture.2.x * u) as u32;
-                        let texture_y =
-                            (texture.0.y * s + texture.1.y * t + texture.2.y * u) as u32;
-
-                        let color = self
-                            .texture
-                            .get_pixel(texture_x, texture_y)
-                            .map(|x| (x as f32 * intensity) as u8);
-
-                        image.put_pixel(x, y, color);
-                        zbuffer[x as usize][y as usize] = z;
-                    }
+                    self.draw_point((s, t, u), zbuffer, (x, y, z), texture, intensity, image);
                 }
             }
         }
     }
+
+    fn draw_point(
+        &self,
+        (s, t, u): (f32, f32, f32),
+        zbuffer: &mut [Vec<f32>],
+        (x, y, z): (u32, u32, f32),
+        texture: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
+        intensity: f32,
+        image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
+    ) {
+        if zbuffer[x as usize][y as usize] < z {
+            let texture_x = (texture.0.x * s + texture.1.x * t + texture.2.x * u) as u32;
+            let texture_y = (texture.0.y * s + texture.1.y * t + texture.2.y * u) as u32;
+
+            let color = self
+                .texture
+                .get_pixel(texture_x, texture_y)
+                .map(|x| (x as f32 * intensity) as u8);
+
+            image.put_pixel(x, y, color);
+            zbuffer[x as usize][y as usize] = z;
+        }
+    }
+}
+
+fn draw_grey_image(zbuffer: Vec<Vec<f32>>, width: u32, height: u32) {
+    let grey: Vec<Vec<u8>> = zbuffer
+        .iter()
+        .map(|x| x.iter().map(|y| *y as u8).collect())
+        .collect();
+
+    let mut grey_image: RgbImage = ImageBuffer::new(width, height);
+    for (x, line) in grey.iter().enumerate() {
+        for (y, color) in line.iter().enumerate() {
+            let color = Rgb([*color, *color, *color]);
+            grey_image.put_pixel(x as u32, (width - 1) - y as u32, color);
+        }
+    }
+    grey_image.save("grey.png").unwrap();
 }
 
 fn get_color_triangle(
@@ -170,9 +197,9 @@ impl Triangle3d {
         (self.a, self.b, self.c)
     }
 
-    pub fn barycentric_coords(&self, (x, y): (u32, u32)) -> Option<(f32, f32, f32)> {
-        let x = x as f32;
-        let y = y as f32;
+    pub fn contains_point(&self, (x, y): (u32, u32)) -> Option<(f32, f32, f32)> {
+        let x = x as f32 + 0.5;
+        let y = y as f32 + 0.5;
 
         let (p1, p2, p3) = self.get_vertices();
 
