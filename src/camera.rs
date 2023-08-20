@@ -52,10 +52,15 @@ impl Camera {
     }
 
     pub fn lookat(&mut self, eye: Vector3<f32>, focus: Vector3<f32>, up: Vector3<f32>) {
-        let z: Vector3<f32> = (focus - eye).normalize();
+        self.viewing_direction = (focus - eye).normalize();
+        let z: Vector3<f32> = self.viewing_direction;
         let x: Vector3<f32> = up.cross(&z).normalize();
         let y: Vector3<f32> = z.cross(&x).normalize();
 
         self.model_view = matrix![x.x, x.y, x.z, -focus.x; y.x, y.y, y.z, -focus.y; z.x, z.y, z.z, -focus.z; 0.0, 0.0, 0.0, 1.0];
+    }
+
+    pub fn view_dir(&self) -> Vector3<f32> {
+        self.viewing_direction
     }
 }

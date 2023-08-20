@@ -60,7 +60,7 @@ impl Object {
     }
 
     fn set_pixels_in_buffer(&self, img: &mut RgbImage) {
-        let light_direction = Vector3::new(-2.0, -1.0, -1.0);
+        let light_direction = Vector3::new(-2.0, -1.0, -1.0).normalize();
 
         let (width, height) = img.dimensions();
         let mut zbuffer: Vec<Vec<f32>> = vec![vec![0.0; height as usize]; width as usize];
@@ -88,10 +88,7 @@ impl Object {
         texture: &(Vector3<f32>, Vector3<f32>, Vector3<f32>),
     ) {
         let ((x0, y0), (x1, y1)) = get_bounding_box(triangle);
-        let x0 = x0.floor().max(0.0) as u32;
-        let y0 = y0.floor().max(0.0) as u32;
-        let x1 = (x1.ceil() as u32).min(image.dimensions().0 - 1);
-        let y1 = (y1.ceil().max(0.0) as u32).min(image.dimensions().1 - 1);
+        let (x0, y0, x1, y1) = clamp(x0, y0, x1, y1, image.dimensions());
 
         for x in x0..=x1 {
             for y in y0..=y1 {
@@ -113,18 +110,28 @@ impl Object {
         image: &mut ImageBuffer<Rgb<u8>, Vec<u8>>,
     ) {
         if zbuffer[x as usize][y as usize] < z {
-            let texture_x = (texture.0.x * s + texture.1.x * t + texture.2.x * u) as u32;
-            let texture_y = (texture.0.y * s + texture.1.y * t + texture.2.y * u) as u32;
+            // let texture_x = (texture.0.x * s + texture.1.x * t + texture.2.x * u) as u32;
+            // let texture_y = (texture.0.y * s + texture.1.y * t + texture.2.y * u) as u32;
 
-            let color = self
-                .texture
-                .get_pixel(texture_x, texture_y)
-                .map(|x| (x as f32 * intensity) as u8);
+            // let color = self
+            //     .texture
+            //     .get_pixel(texture_x, texture_y)
+            //     .map(|x| (x as f32 * intensity) as u8);
+
+            let color: Rgb<u8> = Rgb([255, 255, 255]).map(|x| (x as f32 * intensity) as u8);
 
             image.put_pixel(x, y, color);
             zbuffer[x as usize][y as usize] = z;
         }
     }
+}
+
+fn clamp(x0: f32, y0: f32, x1: f32, y1: f32, (width, height): (u32, u32)) -> (u32, u32, u32, u32) {
+    let x0 = x0.floor().max(0.0) as u32;
+    let y0 = y0.floor().max(0.0) as u32;
+    let x1 = (x1.ceil() as u32).min(width - 1);
+    let y1 = (y1.ceil().max(0.0) as u32).min(height - 1);
+    (x0, y0, x1, y1)
 }
 
 fn draw_grey_image(zbuffer: Vec<Vec<f32>>, width: u32, height: u32) {
