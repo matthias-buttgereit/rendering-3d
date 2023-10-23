@@ -136,9 +136,6 @@ impl Object {
                 .get_pixel(texture_x, texture_y)
                 .map(|x| (x as f32 * intensity) as u8);
 
-            // let color: Rgb<u8> =
-            //     Rgb([255, 255, 255]).map(|x| (x as f32 * (-1.0) * intensity.dot(&normal)) as u8);
-
             image.put_pixel(x, y, color);
             zbuffer[x as usize][y as usize] = z;
         }
@@ -166,7 +163,7 @@ fn draw_grey_image(zbuffer: Vec<Vec<f32>>, width: u32, height: u32) {
             grey_image.put_pixel(x as u32, (width - 1) - y as u32, color);
         }
     }
-    grey_image.save("grey.png").unwrap();
+    grey_image.save("output/grey.png").unwrap();
 }
 
 fn get_color_triangle(
